@@ -84,12 +84,12 @@
   <ul class="list" id="list"></ul>
   <div class="state" id="state"><span class="spin"></span></div>
 
-  <div class="foot" id="foot">카드내역 뷰어 v0.1.0</div>
+  <div class="foot" id="foot">카드내역 뷰어 v0.1.1</div>
 </div>
 
 <script>
 /* ============================================================
-   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.1.0
+   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.1.1
    - 구글시트(gviz/CDN)를 직접 읽어 이번달 카드 사용내역을 표시.
    - 앱스크립트를 거치지 않아 배너 없음 + 콜드스타트 없음(0.5초대).
    - 데이터: '연 지출'에서 카드계정(부채증가−빌린돈) → 이번달 시트에서
@@ -122,7 +122,8 @@ function gviz(params){
 function cell(c, i){ return (c && c.length > i && c[i] && c[i].v != null) ? c[i].v : ''; }
 function cellF(c, i){ return (c && c.length > i && c[i] && c[i].f != null) ? c[i].f : ''; }
 function won(n){ return Math.round(n).toLocaleString() + '원'; }
-function man(n){ return Math.round(n/10000) + '만'; }
+// 남은금액은 올림(ceil): 적게 표기하면 그만큼 덜 써서 우대 놓침 방지. (사용액은 won으로 원단위 정확 표기)
+function man(n){ return Math.ceil(n/10000) + '만'; }
 
 function monthName(){
   var d = new Date();
@@ -225,7 +226,7 @@ function load(){
     .then(function(set){ return loadCardTxns(set); })
     .then(function(r){ renderKB(r.list); renderList(r.name, r.list);
       document.getElementById('foot').textContent =
-        '카드내역 뷰어 v0.1.0 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
+        '카드내역 뷰어 v0.1.1 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
     .catch(function(e){
       state.className = 'state err';
       state.textContent = '불러오기 실패: ' + (e && e.message ? e.message : '알 수 없음');
