@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>승목 가계부 · 카드 사용내역</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"가계부 카드내역","short_name":"카드내역","display":"standalone","background_color":"%230f1115","theme_color":"%230f1115","icons":[]}'>
+<style>
+  :root{
+    --bg:#0f1115; --card:#181b22; --card2:#1f232c; --line:#2a2f3a;
+    --txt:#eef1f6; --sub:#9aa4b2; --accent:#5b9dff; --amt:#ffd479;
+    --red:#ff6b6b; --yellow:#ffd166; --green:#4ade80;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; background:var(--bg); color:var(--txt);
+    font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+    font-size:18px; line-height:1.5;}
+  .wrap{max-width:600px; margin:0 auto; padding:16px 14px 40px;}
+  header{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;}
+  header h1{font-size:1.15rem; font-weight:700; margin:0;}
+  header .month{color:var(--sub); font-size:.9rem; margin-top:2px;}
+  button.refresh{background:var(--card2); color:var(--txt); border:1px solid var(--line);
+    border-radius:10px; padding:9px 14px; font-size:1rem; font-weight:600;}
+  button.refresh:active{background:#2a2f3a}
+
+  .kb{background:linear-gradient(160deg,#1c2230,#181b22); border:1px solid var(--line);
+    border-radius:16px; padding:16px 16px 14px; margin-bottom:14px;}
+  .kb .top{display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
+  .kb .used{font-size:1.7rem; font-weight:800; letter-spacing:-.5px;}
+  .kb .tier{font-size:1rem; font-weight:700;}
+  .kb .msg{color:var(--sub); font-size:.95rem; margin-top:4px;}
+  .bar{height:14px; border-radius:8px; background:#0c0e12; border:1px solid var(--line);
+    margin-top:12px; overflow:hidden;}
+  .bar > i{display:block; height:100%; border-radius:8px; transition:width .4s ease;}
+  .ticks{display:flex; justify-content:space-between; color:var(--sub); font-size:.72rem; margin-top:5px;}
+
+  .summary{display:flex; align-items:center; justify-content:space-between;
+    padding:2px 4px 10px; color:var(--sub); font-size:.95rem;}
+  .summary b{color:var(--txt); font-size:1.05rem;}
+
+  ul.list{list-style:none; margin:0; padding:0;}
+  ul.list li{display:flex; align-items:center; gap:12px; padding:13px 6px;
+    border-bottom:1px solid var(--line);}
+  li .d{width:46px; flex:0 0 auto; color:var(--sub); font-size:.86rem; text-align:center;}
+  li .mid{flex:1 1 auto; min-width:0;}
+  li .desc{font-size:1.05rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  li .card{color:var(--sub); font-size:.82rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  li .amt{flex:0 0 auto; font-weight:800; font-size:1.1rem; color:var(--amt); white-space:nowrap;}
+
+  .state{text-align:center; color:var(--sub); padding:48px 12px; font-size:1rem;}
+  .state.err{color:var(--red);}
+  .foot{text-align:center; color:#5b6472; font-size:.75rem; margin-top:22px;}
+  .spin{display:inline-block; width:20px; height:20px; border:3px solid var(--line);
+    border-top-color:var(--accent); border-radius:50%; animation:sp .8s linear infinite; vertical-align:-4px;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>카드 사용내역</h1>
+      <div class="month" id="month">불러오는 중…</div>
+    </div>
+    <button class="refresh" id="refresh">새로고침</button>
+  </header>
+
+  <section class="kb" id="kb" style="display:none">
+    <div class="top">
+      <div class="used" id="kbUsed">0원</div>
+      <div class="tier" id="kbTier">🔴 우대 0%p</div>
+    </div>
+    <div class="msg" id="kbMsg"></div>
+    <div class="bar"><i id="kbBar" style="width:0%"></i></div>
+    <div class="ticks"><span>0</span><span>30만</span><span>60만</span><span>90만</span></div>
+  </section>
+
+  <div class="summary" id="summary" style="display:none">
+    <span id="cnt">0건</span>
+    <span>합계 <b id="total">0원</b></span>
+  </div>
+
+  <ul class="list" id="list"></ul>
+  <div class="state" id="state"><span class="spin"></span></div>
+
+  <div class="foot" id="foot">카드내역 뷰어 v0.1.0</div>
+</div>
+
+<script>
+/* ============================================================
+   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.1.0
+   - 구글시트(gviz/CDN)를 직접 읽어 이번달 카드 사용내역을 표시.
+   - 앱스크립트를 거치지 않아 배너 없음 + 콜드스타트 없음(0.5초대).
+   - 데이터: '연 지출'에서 카드계정(부채증가−빌린돈) → 이번달 시트에서
+     대변계정이 카드인 거래만 필터(서버 getCards_/currentMonthCardList_와 동일 로직).
+   ============================================================ */
+var SHEET_ID = '1R2zaTjh3ZB6Ymz14W_fQE3aaM0nR4MyLeFA0f_phJSs';
+var GID_YEAR = '962876725';          // '연 지출' 탭(카드계정 목록). 고정 gid.
+var NOT_CARDS = ['빌린돈'];          // 부채지만 카드가 아닌 계정(서버 notCards)
+var KB_PREFIX = '승목 KB_대출';      // 주담대 우대 실적을 세는 카드(접두 일치)
+var TIERS = [                         // 30/60/90만 → 0.1/0.2/0.3%p
+  {at:300000, pt:'0.1'}, {at:600000, pt:'0.2'}, {at:900000, pt:'0.3'}
+];
+
+var cbSeq = 0;
+function gviz(params){
+  return new Promise(function(res, rej){
+    var cb = 'gvcb_' + (cbSeq++);
+    var timer = setTimeout(function(){ cleanup(); rej(new Error('시간 초과')); }, 12000);
+    function cleanup(){ clearTimeout(timer); delete window[cb]; if(s.parentNode) s.parentNode.removeChild(s); }
+    window[cb] = function(d){ cleanup(); res(d); };
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq'
+      + '?tqx=out:json;responseHandler:' + cb
+      + '&' + params + '&_=' + Date.now();
+    var s = document.createElement('script');
+    s.src = url;
+    s.onerror = function(){ cleanup(); rej(new Error('네트워크 오류')); };
+    document.body.appendChild(s);
+  });
+}
+function cell(c, i){ return (c && c.length > i && c[i] && c[i].v != null) ? c[i].v : ''; }
+function cellF(c, i){ return (c && c.length > i && c[i] && c[i].f != null) ? c[i].f : ''; }
+function won(n){ return Math.round(n).toLocaleString() + '원'; }
+function man(n){ return Math.round(n/10000) + '만'; }
+
+function monthName(){
+  var d = new Date();
+  return '생활비 ' + (d.getFullYear() % 100) + '/' + (d.getMonth() + 1);
+}
+
+// '연 지출'에서 카드계정 집합 만들기 (대변유형 K=10, 대변계정 L=11)
+function loadCards(){
+  return gviz('gid=' + GID_YEAR + '&range=A1:L120&headers=0').then(function(d){
+    var rows = d.table.rows || [], type = '', set = {};
+    for (var i=0;i<rows.length;i++){
+      var c = rows[i].c;
+      var t = String(cell(c,10)).trim(), a = String(cell(c,11)).trim();
+      if (t) type = t;
+      if (type === '부채증가' && a && NOT_CARDS.indexOf(a) < 0) set[a] = 1;
+    }
+    return set;
+  });
+}
+
+// 이번달 시트에서 카드 거래만 (A=0 날짜, H=7 차변계정, K=10 대변분류, L=11 대변계정, M=12 대변금액, N=13 비고)
+function loadCardTxns(cardSet){
+  var name = monthName();
+  return gviz('sheet=' + encodeURIComponent(name) + '&range=A7:N400&headers=0').then(function(d){
+    var rows = d.table.rows || [], out = [];
+    for (var i=0;i<rows.length;i++){
+      var c = rows[i].c;
+      var acct = String(cell(c,11)).trim();
+      var amt = Number(cell(c,12)) || 0;
+      if (!acct || !cardSet[acct] || !amt) continue;
+      var desc = String(cell(c,13)).trim() || String(cell(c,7)).trim() || '-';
+      out.push({ d: cellF(c,0) || '', desc: desc, card: acct, amt: amt });
+    }
+    out.reverse();  // 최신이 위로
+    return { name: name, list: out };
+  });
+}
+
+function kbTier(used){
+  var pt = '0', next = TIERS[0];
+  for (var i=0;i<TIERS.length;i++){ if (used >= TIERS[i].at){ pt = TIERS[i].pt; next = TIERS[i+1] || null; } }
+  var emoji = used >= 900000 ? '🟢' : used >= 600000 ? '🟢' : used >= 300000 ? '🟡' : '🔴';
+  return { pt: pt, emoji: emoji, next: next };
+}
+
+function renderKB(list){
+  var used = 0;
+  for (var i=0;i<list.length;i++){ if (list[i].card.indexOf(KB_PREFIX) === 0) used += list[i].amt; }
+  var t = kbTier(used);
+  document.getElementById('kbUsed').textContent = won(used);
+  document.getElementById('kbTier').textContent = t.emoji + ' 우대 ' + t.pt + '%p';
+  var msg, color;
+  if (t.next){
+    msg = man(t.next.at - used) + '원 더 쓰면 금리 ' + t.next.pt + '%p 내려감';
+  } else {
+    msg = '최고 우대 달성 (90만원 이상)';
+  }
+  document.getElementById('kbMsg').textContent = msg;
+  var pct = Math.min(100, used / 900000 * 100);
+  color = used >= 600000 ? 'var(--green)' : used >= 300000 ? 'var(--yellow)' : 'var(--red)';
+  var bar = document.getElementById('kbBar');
+  bar.style.width = pct + '%'; bar.style.background = color;
+  document.getElementById('kb').style.display = '';
+}
+
+function renderList(name, list){
+  document.getElementById('month').textContent = name.replace('생활비 ', '') + ' · KB 주담대 우대';
+  var state = document.getElementById('state');
+  var ul = document.getElementById('list');
+  ul.innerHTML = '';
+  if (!list.length){
+    state.className = 'state';
+    state.textContent = '이번달 카드 사용내역이 없어요.';
+    document.getElementById('summary').style.display = 'none';
+    return;
+  }
+  state.textContent = '';
+  var total = 0;
+  for (var i=0;i<list.length;i++){
+    var x = list[i]; total += x.amt;
+    var li = document.createElement('li');
+    li.innerHTML =
+      '<div class="d">' + esc(x.d) + '</div>' +
+      '<div class="mid"><div class="desc">' + esc(x.desc) + '</div>' +
+      '<div class="card">' + esc(x.card) + '</div></div>' +
+      '<div class="amt">' + Math.round(x.amt).toLocaleString() + '</div>';
+    ul.appendChild(li);
+  }
+  document.getElementById('cnt').textContent = list.length + '건';
+  document.getElementById('total').textContent = won(total);
+  document.getElementById('summary').style.display = '';
+}
+function esc(s){ return String(s).replace(/[&<>]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[m]; }); }
+
+function load(){
+  var state = document.getElementById('state');
+  state.className = 'state'; state.innerHTML = '<span class="spin"></span>';
+  document.getElementById('list').innerHTML = '';
+  loadCards()
+    .then(function(set){ return loadCardTxns(set); })
+    .then(function(r){ renderKB(r.list); renderList(r.name, r.list);
+      document.getElementById('foot').textContent =
+        '카드내역 뷰어 v0.1.0 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
+    .catch(function(e){
+      state.className = 'state err';
+      state.textContent = '불러오기 실패: ' + (e && e.message ? e.message : '알 수 없음');
+    });
+}
+document.getElementById('refresh').addEventListener('click', load);
+load();
+</script>
+</body>
+</html>
