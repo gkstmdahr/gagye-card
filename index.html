@@ -84,12 +84,12 @@
   <ul class="list" id="list"></ul>
   <div class="state" id="state"><span class="spin"></span></div>
 
-  <div class="foot" id="foot">카드내역 뷰어 v0.2.2</div>
+  <div class="foot" id="foot">카드내역 뷰어 v0.2.3</div>
 </div>
 
 <script>
 /* ============================================================
-   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.2.2
+   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.2.3
    - 구글시트(gviz/CDN)를 직접 읽어 이번달 카드 사용내역을 표시.
    - 앱스크립트를 거치지 않아 배너 없음 + 콜드스타트 없음(0.5초대).
    - 데이터: '연 지출'에서 카드계정(부채증가−빌린돈) → 이번달 시트에서
@@ -144,7 +144,7 @@ function loadCards(){
   });
 }
 
-// 이번달 시트에서 카드 거래만 (A=0 날짜, H=7 차변계정, J=9 비고(사용자기입), K=10 대변분류, L=11 대변계정, M=12 대변금액, N=13 비고(보조))
+// 이번달 시트에서 카드 거래만 (A=0 날짜, F=5 시간(HH:mm), H=7 차변계정, J=9 비고(사용자기입), K=10 대변분류, L=11 대변계정, M=12 대변금액, N=13 비고(보조))
 function loadCardTxns(cardSet){
   var name = monthName();
   return gviz('sheet=' + encodeURIComponent(name) + '&range=A7:N400&headers=0').then(function(d){
@@ -156,7 +156,8 @@ function loadCardTxns(cardSet){
       if (!acct || !cardSet[acct] || !amt) continue;
       var cat = String(cell(c,7)).trim();     // 차변계정 = 카테고리
       var memo = String(cell(c,9)).trim() || String(cell(c,13)).trim();   // 비고 J(사용자기입) 우선, 없으면 N
-      out.push({ d: cellF(c,0) || '', cat: cat, memo: memo, card: acct, amt: amt });
+      var tm = String(cellF(c,5)).trim();     // F열 = 시간(HH:mm)
+      out.push({ d: cellF(c,0) || '', t: tm, cat: cat, memo: memo, card: acct, amt: amt });
     }
     out.reverse();  // 최신이 위로
     return { name: name, list: out };
@@ -206,8 +207,9 @@ function renderList(name, list){
   for (var i=0;i<list.length;i++){
     var x = list[i]; total += x.amt;
     var li = document.createElement('li');
+    var when = (x.d || '') + (x.t ? (x.d ? ' ' : '') + x.t : '');
     li.innerHTML =
-      '<span class="date">' + esc(x.d || '') + '</span>' +
+      '<span class="date">' + esc(when) + '</span>' +
       '<span class="memo">' + esc(x.memo || x.cat || '') + '</span>' +
       '<span class="amt">' + Math.round(x.amt).toLocaleString() + '</span>';
     ul.appendChild(li);
@@ -226,7 +228,7 @@ function load(){
     .then(function(set){ return loadCardTxns(set); })
     .then(function(r){ renderKB(r.list); renderList(r.name, r.list);
       document.getElementById('foot').textContent =
-        '카드내역 뷰어 v0.2.2 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
+        '카드내역 뷰어 v0.2.3 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
     .catch(function(e){
       state.className = 'state err';
       state.textContent = '불러오기 실패: ' + (e && e.message ? e.message : '알 수 없음');
