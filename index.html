@@ -84,12 +84,12 @@
   <ul class="list" id="list"></ul>
   <div class="state" id="state"><span class="spin"></span></div>
 
-  <div class="foot" id="foot">카드내역 뷰어 v0.2.3</div>
+  <div class="foot" id="foot">카드내역 뷰어 v0.2.4</div>
 </div>
 
 <script>
 /* ============================================================
-   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.2.3
+   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.2.4
    - 구글시트(gviz/CDN)를 직접 읽어 이번달 카드 사용내역을 표시.
    - 앱스크립트를 거치지 않아 배너 없음 + 콜드스타트 없음(0.5초대).
    - 데이터: '연 지출'에서 카드계정(부채증가−빌린돈) → 이번달 시트에서
@@ -98,7 +98,7 @@
 var SHEET_ID = '1R2zaTjh3ZB6Ymz14W_fQE3aaM0nR4MyLeFA0f_phJSs';
 var GID_YEAR = '962876725';          // '연 지출' 탭(카드계정 목록). 고정 gid.
 var NOT_CARDS = ['빌린돈'];          // 부채지만 카드가 아닌 계정(서버 notCards)
-var KB_PREFIX = '승목 KB_대출';      // 주담대 우대 실적을 세는 카드(접두 일치)
+var KB_PREFIX = '승목 KB_';          // 주담대 우대 실적 카드(승목 KB_대출·All·케이패스 등 KB카드 전부 합산)
 var TIERS = [                         // 30/60/90만 → 0.1/0.2/0.3%p
   {at:300000, pt:'0.1'}, {at:600000, pt:'0.2'}, {at:900000, pt:'0.3'}
 ];
@@ -228,7 +228,7 @@ function load(){
     .then(function(set){ return loadCardTxns(set); })
     .then(function(r){ renderKB(r.list); renderList(r.name, r.list);
       document.getElementById('foot').textContent =
-        '카드내역 뷰어 v0.2.3 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
+        '카드내역 뷰어 v0.2.4 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
     .catch(function(e){
       state.className = 'state err';
       state.textContent = '불러오기 실패: ' + (e && e.message ? e.message : '알 수 없음');
