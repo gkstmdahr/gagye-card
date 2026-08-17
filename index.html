@@ -34,6 +34,11 @@
     margin-top:12px; overflow:hidden;}
   .bar > i{display:block; height:100%; border-radius:8px; transition:width .4s ease;}
   .ticks{display:flex; justify-content:space-between; color:var(--sub); font-size:.72rem; margin-top:5px;}
+  .kbCards{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;}
+  .kbCards .c{background:var(--card2); border:1px solid var(--line); border-radius:8px;
+    padding:4px 9px; font-size:.82rem; display:flex; gap:6px; align-items:baseline;}
+  .kbCards .c .n{color:var(--sub);}
+  .kbCards .c .v{color:var(--amt); font-weight:700; font-variant-numeric:tabular-nums;}
 
   .summary{display:flex; align-items:center; justify-content:space-between;
     padding:2px 4px 10px; color:var(--sub); font-size:.95rem;}
@@ -74,6 +79,7 @@
     <div class="msg" id="kbMsg"></div>
     <div class="bar"><i id="kbBar" style="width:0%"></i></div>
     <div class="ticks"><span>0</span><span>30만</span><span>60만</span><span>90만</span></div>
+    <div class="kbCards" id="kbCards"></div>
   </section>
 
   <div class="summary" id="summary" style="display:none">
@@ -84,12 +90,12 @@
   <ul class="list" id="list"></ul>
   <div class="state" id="state"><span class="spin"></span></div>
 
-  <div class="foot" id="foot">카드내역 뷰어 v0.2.4</div>
+  <div class="foot" id="foot">카드내역 뷰어 v0.2.5</div>
 </div>
 
 <script>
 /* ============================================================
-   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.2.4
+   승목 가계부 · 카드 사용내역 뷰어 (정적 PWA)  v0.2.5
    - 구글시트(gviz/CDN)를 직접 읽어 이번달 카드 사용내역을 표시.
    - 앱스크립트를 거치지 않아 배너 없음 + 콜드스타트 없음(0.5초대).
    - 데이터: '연 지출'에서 카드계정(부채증가−빌린돈) → 이번달 시트에서
@@ -171,9 +177,17 @@ function kbTier(used){
   return { pt: pt, emoji: emoji, next: next };
 }
 
+// 카드 표시명: '승목 KB_대출 8074' → '대출' (접두 '승목 KB_' + 뒤 번호 제거)
+function kbShort(card){ return String(card).replace(/^승목 KB_/, '').replace(/\s*\d{3,}$/, '').trim() || card; }
+
 function renderKB(list){
-  var used = 0;
-  for (var i=0;i<list.length;i++){ if (list[i].card.indexOf(KB_PREFIX) === 0) used += list[i].amt; }
+  var used = 0, byCard = {};
+  for (var i=0;i<list.length;i++){
+    if (list[i].card.indexOf(KB_PREFIX) === 0){
+      used += list[i].amt;
+      byCard[list[i].card] = (byCard[list[i].card] || 0) + list[i].amt;   // 카드별 합계
+    }
+  }
   var t = kbTier(used);
   document.getElementById('kbUsed').textContent = won(used);
   document.getElementById('kbTier').textContent = t.emoji + ' 우대 ' + t.pt + '%p';
@@ -188,6 +202,14 @@ function renderKB(list){
   color = used >= 600000 ? 'var(--green)' : used >= 300000 ? 'var(--yellow)' : 'var(--red)';
   var bar = document.getElementById('kbBar');
   bar.style.width = pct + '%'; bar.style.background = color;
+
+  // 카드별 사용액 칩 (금액 큰 순, 0원 카드는 숨김)
+  var cards = Object.keys(byCard).filter(function(k){ return byCard[k] > 0; })
+    .sort(function(a,b){ return byCard[b] - byCard[a]; });
+  document.getElementById('kbCards').innerHTML = cards.map(function(k){
+    return '<span class="c"><span class="n">' + kbShort(k) + '</span><span class="v">' + won(byCard[k]) + '</span></span>';
+  }).join('');
+
   document.getElementById('kb').style.display = '';
 }
 
@@ -228,7 +250,7 @@ function load(){
     .then(function(set){ return loadCardTxns(set); })
     .then(function(r){ renderKB(r.list); renderList(r.name, r.list);
       document.getElementById('foot').textContent =
-        '카드내역 뷰어 v0.2.4 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
+        '카드내역 뷰어 v0.2.5 · ' + new Date().toLocaleTimeString('ko-KR') + ' 기준'; })
     .catch(function(e){
       state.className = 'state err';
       state.textContent = '불러오기 실패: ' + (e && e.message ? e.message : '알 수 없음');
